@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copilot Usage Tracker - Design Mockup</title>
+  <style>
+    /* Approximate GitHub's dark theme styling */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      background-color: #0d1117;
+      color: #e6edf3;
+      padding: 40px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .text-bold { font-weight: 600; }
+    .color-fg-muted { color: #8b949e; }
+    .mb-1 { margin-bottom: 4px; }
+    .mt-2 { margin-top: 8px; }
+    .mb-2 { margin-bottom: 8px; }
+
+    /* Original GitHub progress bar styles */
+    .Progress {
+      display: flex;
+      height: 8px;
+      overflow: hidden;
+      background-color: #21262d;
+      border-radius: 6px;
+    }
+    .Progress--large { height: 10px; }
+    .Progress-item {
+      height: 100%;
+      border-radius: 6px;
+    }
+    .color-bg-success-emphasis { background-color: #238636; }
+
+    /* --- Monkey Enhancement Styles --- */
+
+    .monkey-progress-container {
+      position: relative;
+      width: 100%;
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    /* The layered progress bar stack */
+    .monkey-progress-stack {
+      position: relative;
+      height: 10px;
+      background-color: #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    /* Usage bar (bottom layer) */
+    .monkey-bar-usage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      border-radius: 6px;
+      z-index: 2;
+    }
+
+    /* Time elapsed marker (top layer - thin vertical line) */
+    .monkey-bar-time-marker {
+      position: absolute;
+      top: -3px;
+      height: calc(100% + 6px);
+      width: 2px;
+      background-color: #e6edf3;
+      z-index: 3;
+      border-radius: 1px;
+    }
+
+    /* Status labels row */
+    .monkey-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    .monkey-status-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .monkey-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .monkey-status-badge {
+      padding: 1px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Under budget */
+    .monkey-status-under { color: #3fb950; }
+    .monkey-status-under .monkey-status-badge {
+      background-color: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
+    }
+
+    /* Over budget */
+    .monkey-status-over { color: #f85149; }
+    .monkey-status-over .monkey-status-badge {
+      background-color: rgba(248, 81, 73, 0.15);
+      color: #f85149;
+    }
+
+    /* On track */
+    .monkey-status-ontrack { color: #8b949e; }
+    .monkey-status-ontrack .monkey-status-badge {
+      background-color: rgba(139, 148, 158, 0.15);
+      color: #8b949e;
+    }
+
+    /* Legend */
+    .monkey-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+
+    /* Scenario sections */
+    .scenario {
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .scenario-title {
+      font-size: 14px;
+      color: #8b949e;
+      margin-bottom: 12px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <h2 style="margin-bottom: 32px;">🐵 Copilot Usage Tracker — Design Mockup</h2>
+
+  <!-- ============================================ -->
+  <!-- Scenario 1: Under budget (usage < time %) -->
+  <!-- ============================================ -->
+  <div class="scenario">
+    <div class="scenario-title">Scenario: Under budget — 15.9% used, 40% of month elapsed</div>
+
+    <div style="display: inline-flex; justify-content: space-between; flex: 1; flex-direction: column; width: 100%;">
+      <div style="display: inline-flex; align-items: center; justify-content: space-between; flex-direction: row;">
+        <span class="mb-1 text-bold">Premium requests</span>
+        <div>15.9%</div>
+      </div>
+
+      <!-- Enhanced progress bar -->
+      <div class="monkey-progress-container">
+        <div class="monkey-progress-stack">
+          <!-- Usage bar -->
+          <div class="monkey-bar-usage color-bg-success-emphasis" style="width: 15.9%;"></div>
+          <!-- Time elapsed marker -->
+          <div class="monkey-bar-time-marker" style="left: 40%;"></div>
+        </div>
+
+        <div class="monkey-status-row">
+          <div class="monkey-legend">
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #238636;"></span> Usage: 15.9%
+            </span>
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #e6edf3;"></span> Month elapsed: 40%
+            </span>
+          </div>
+          <span class="monkey-status-under">
+            <span class="monkey-status-badge">▼ 24.1% under</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Scenario 2: Over budget (usage > time %) -->
+  <!-- ============================================ -->
+  <div class="scenario">
+    <div class="scenario-title">Scenario: Over budget — 65% used, 40% of month elapsed</div>
+
+    <div style="display: inline-flex; justify-content: space-between; flex: 1; flex-direction: column; width: 100%;">
+      <div style="display: inline-flex; align-items: center; justify-content: space-between; flex-direction: row;">
+        <span class="mb-1 text-bold">Premium requests</span>
+        <div>65%</div>
+      </div>
+
+      <!-- Enhanced progress bar -->
+      <div class="monkey-progress-container">
+        <div class="monkey-progress-stack">
+          <!-- Usage bar (red when over) -->
+          <div class="monkey-bar-usage" style="width: 65%; background-color: #f85149; border-radius: 6px;"></div>
+          <!-- Time elapsed marker -->
+          <div class="monkey-bar-time-marker" style="left: 40%;"></div>
+        </div>
+
+        <div class="monkey-status-row">
+          <div class="monkey-legend">
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #f85149;"></span> Usage: 65%
+            </span>
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #e6edf3;"></span> Month elapsed: 40%
+            </span>
+          </div>
+          <span class="monkey-status-over">
+            <span class="monkey-status-badge">▲ 25% over</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Scenario 3: On track (usage ≈ time %) -->
+  <!-- ============================================ -->
+  <div class="scenario">
+    <div class="scenario-title">Scenario: On track — 39% used, 40% of month elapsed</div>
+
+    <div style="display: inline-flex; justify-content: space-between; flex: 1; flex-direction: column; width: 100%;">
+      <div style="display: inline-flex; align-items: center; justify-content: space-between; flex-direction: row;">
+        <span class="mb-1 text-bold">Premium requests</span>
+        <div>39%</div>
+      </div>
+
+      <!-- Enhanced progress bar -->
+      <div class="monkey-progress-container">
+        <div class="monkey-progress-stack">
+          <!-- Usage bar -->
+          <div class="monkey-bar-usage color-bg-success-emphasis" style="width: 39%;"></div>
+          <!-- Time elapsed marker -->
+          <div class="monkey-bar-time-marker" style="left: 40%;"></div>
+        </div>
+
+        <div class="monkey-status-row">
+          <div class="monkey-legend">
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #238636;"></span> Usage: 39%
+            </span>
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #e6edf3;"></span> Month elapsed: 40%
+            </span>
+          </div>
+          <span class="monkey-status-ontrack">
+            <span class="monkey-status-badge">≈ On track</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Scenario 4: High usage near end of month -->
+  <!-- ============================================ -->
+  <div class="scenario">
+    <div class="scenario-title">Scenario: Near end of month — 88% used, 90% of month elapsed</div>
+
+    <div style="display: inline-flex; justify-content: space-between; flex: 1; flex-direction: column; width: 100%;">
+      <div style="display: inline-flex; align-items: center; justify-content: space-between; flex-direction: row;">
+        <span class="mb-1 text-bold">Premium requests</span>
+        <div>88%</div>
+      </div>
+
+      <!-- Enhanced progress bar -->
+      <div class="monkey-progress-container">
+        <div class="monkey-progress-stack">
+          <!-- Usage bar -->
+          <div class="monkey-bar-usage color-bg-success-emphasis" style="width: 88%;"></div>
+          <!-- Time elapsed marker -->
+          <div class="monkey-bar-time-marker" style="left: 90%;"></div>
+        </div>
+
+        <div class="monkey-status-row">
+          <div class="monkey-legend">
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #238636;"></span> Usage: 88%
+            </span>
+            <span class="monkey-status-label">
+              <span class="monkey-dot" style="background-color: #e6edf3;"></span> Month elapsed: 90%
+            </span>
+          </div>
+          <span class="monkey-status-under">
+            <span class="monkey-status-badge">▼ 2% under</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
