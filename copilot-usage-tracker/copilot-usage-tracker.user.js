@@ -1,94 +1,210 @@
 // ==UserScript==
 // @name        Copilot Usage Tracker
 // @namespace   https://github.com/3096/monke
-// @version     0.1.0
+// @version     0.2.0
 // @description Modifies the GitHub Copilot features settings page to display usage percentage with over/under projected allowance indicators based on how much of the month has passed.
 // @author      3096
 // @match       https://github.com/settings/copilot/features
-// @grant       none
+// @grant       GM_getValue
+// @grant       GM_setValue
+// @grant       GM_registerMenuCommand
 // ==/UserScript==
 
 'use strict';
 
 (function () {
   // =====================================================================
-  // Configuration — Edit these values to match your billing cycle
+  // Configuration — Stored via GM_getValue/GM_setValue
+  // Users can edit these from the Violentmonkey menu → "⚙ Usage Tracker Settings"
   // =====================================================================
-  const CONFIG = {
-    // Which day of the month does the reset period start? (1–28)
-    // e.g. 1 means the cycle resets on the 1st of each month (UTC).
+
+  const DEFAULTS = {
     resetDayOfMonth: 1,
-
-    // Count only workdays (Mon–Fri minus holidays) when calculating
-    // how much of the period has elapsed? If false, every calendar day counts.
     workdaysOnly: false,
-
-    // Company holidays to exclude when workdaysOnly is true.
-    // Format: 'YYYY-MM-DD' strings in UTC.
-    holidays: [
-      // '2026-01-01', // New Year's Day
-      // '2026-05-25', // Memorial Day
-      // '2026-07-04', // Independence Day
-      // '2026-09-07', // Labor Day
-      // '2026-11-26', // Thanksgiving
-      // '2026-12-25', // Christmas
-    ],
-
-    // How close (in percentage points) usage must be to the projected
-    // allowance to be considered "on track" rather than over/under.
-    onTrackThreshold: 2,
+    holidays: [],       // Array of 'YYYY-MM-DD' strings
+    onTrackThreshold: 2, // percentage points
   };
+
+  /**
+   * Load config from GM storage, falling back to defaults.
+   */
+  function loadConfig() {
+    return {
+      resetDayOfMonth: GM_getValue('resetDayOfMonth', DEFAULTS.resetDayOfMonth),
+      workdaysOnly: GM_getValue('workdaysOnly', DEFAULTS.workdaysOnly),
+      holidays: GM_getValue('holidays', DEFAULTS.holidays),
+      onTrackThreshold: GM_getValue('onTrackThreshold', DEFAULTS.onTrackThreshold),
+    };
+  }
+
+  /**
+   * Save a full config object to GM storage.
+   */
+  function saveConfig(config) {
+    GM_setValue('resetDayOfMonth', config.resetDayOfMonth);
+    GM_setValue('workdaysOnly', config.workdaysOnly);
+    GM_setValue('holidays', config.holidays);
+    GM_setValue('onTrackThreshold', config.onTrackThreshold);
+  }
+
+  // =====================================================================
+  // Settings Panel UI
+  // =====================================================================
+
+  function openSettingsPanel() {
+    // Remove existing panel if open
+    const existing = document.getElementById('monkey-settings-overlay');
+    if (existing) existing.remove();
+
+    const config = loadConfig();
+
+    // --- Overlay ---
+    const overlay = document.createElement('div');
+    overlay.id = 'monkey-settings-overlay';
+    Object.assign(overlay.style, {
+      position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.6)', zIndex: '99999',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    });
+
+    // --- Panel ---
+    const panel = document.createElement('div');
+    Object.assign(panel.style, {
+      backgroundColor: '#161b22', color: '#e6edf3', borderRadius: '12px',
+      padding: '24px', width: '460px', maxHeight: '80vh', overflowY: 'auto',
+      border: '1px solid #30363d', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+      fontSize: '14px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    });
+
+    const inputStyle = `
+      background-color: #0d1117; color: #e6edf3; border: 1px solid #30363d;
+      border-radius: 6px; padding: 6px 10px; font-size: 14px; width: 100%;
+      box-sizing: border-box; margin-top: 4px;
+    `;
+    const labelStyle = 'display: block; margin-bottom: 16px;';
+    const captionStyle = 'font-size: 12px; color: #8b949e; margin-top: 4px;';
+
+    panel.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">
+        🐵 Copilot Usage Tracker — Settings
+      </h3>
+
+      <label style="${labelStyle}">
+        <span>Reset day of month</span>
+        <input id="monkey-cfg-resetDay" type="number" min="1" max="28"
+               value="${config.resetDayOfMonth}" style="${inputStyle}" />
+        <div style="${captionStyle}">Which day your billing cycle resets (1–28, UTC).</div>
+      </label>
+
+      <label style="${labelStyle}; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input id="monkey-cfg-workdaysOnly" type="checkbox"
+               ${config.workdaysOnly ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #238636;" />
+        <span>Count workdays only</span>
+      </label>
+      <div style="${captionStyle}; margin-top: -12px; margin-bottom: 16px;">
+        If checked, weekends are excluded from the elapsed-time calculation.
+      </div>
+
+      <label style="${labelStyle}">
+        <span>Company holidays</span>
+        <textarea id="monkey-cfg-holidays" rows="4" style="${inputStyle}; resize: vertical;"
+        >${config.holidays.join('\n')}</textarea>
+        <div style="${captionStyle}">One date per line in YYYY-MM-DD format (UTC). Only used when "workdays only" is enabled.</div>
+      </label>
+
+      <label style="${labelStyle}">
+        <span>On-track threshold (%)</span>
+        <input id="monkey-cfg-threshold" type="number" min="0" max="50" step="0.5"
+               value="${config.onTrackThreshold}" style="${inputStyle}" />
+        <div style="${captionStyle}">How close (in percentage points) usage must be to projected allowance to count as "on track".</div>
+      </label>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
+        <button id="monkey-cfg-cancel" style="
+          background-color: #21262d; color: #e6edf3; border: 1px solid #30363d;
+          border-radius: 6px; padding: 6px 16px; cursor: pointer; font-size: 14px;
+        ">Cancel</button>
+        <button id="monkey-cfg-save" style="
+          background-color: #238636; color: #ffffff; border: 1px solid #238636;
+          border-radius: 6px; padding: 6px 16px; cursor: pointer; font-size: 14px; font-weight: 600;
+        ">Save & Reload</button>
+      </div>
+    `;
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click (outside panel)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    // Cancel
+    document.getElementById('monkey-cfg-cancel').addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    // Save
+    document.getElementById('monkey-cfg-save').addEventListener('click', () => {
+      const resetDay = parseInt(document.getElementById('monkey-cfg-resetDay').value, 10);
+      const workdaysOnly = document.getElementById('monkey-cfg-workdaysOnly').checked;
+      const holidaysRaw = document.getElementById('monkey-cfg-holidays').value.trim();
+      const threshold = parseFloat(document.getElementById('monkey-cfg-threshold').value);
+
+      const holidays = holidaysRaw
+        ? holidaysRaw.split('\n').map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s))
+        : [];
+
+      saveConfig({
+        resetDayOfMonth: Math.max(1, Math.min(28, resetDay || 1)),
+        workdaysOnly,
+        holidays,
+        onTrackThreshold: Math.max(0, threshold || 0),
+      });
+
+      overlay.remove();
+      location.reload();
+    });
+  }
+
+  // Register the settings command in Violentmonkey's menu
+  GM_registerMenuCommand('⚙ Usage Tracker Settings', openSettingsPanel);
+
+  // =====================================================================
+  // Load config for this run
+  // =====================================================================
+  const CONFIG = loadConfig();
 
   // =====================================================================
   // Date / Period Utilities
   // =====================================================================
 
-  /**
-   * Build a Set of holiday date strings for O(1) lookup.
-   */
   const holidaySet = new Set(CONFIG.holidays);
 
-  /**
-   * Return true if a Date falls on a weekday (Mon–Fri) and is not a holiday.
-   */
   function isWorkday(date) {
-    const day = date.getUTCDay(); // 0=Sun … 6=Sat
+    const day = date.getUTCDay();
     if (day === 0 || day === 6) return false;
     const iso = date.toISOString().slice(0, 10);
     return !holidaySet.has(iso);
   }
 
-  /**
-   * Get the start Date (UTC midnight) of the current reset period.
-   */
   function getPeriodStart() {
     const now = new Date();
     const year = now.getUTCFullYear();
-    const month = now.getUTCMonth(); // 0-indexed
+    const month = now.getUTCMonth();
     const resetDay = CONFIG.resetDayOfMonth;
 
-    // If we haven't reached the reset day this month, the period started last month
     if (now.getUTCDate() < resetDay) {
-      const prev = new Date(Date.UTC(year, month - 1, resetDay));
-      return prev;
+      return new Date(Date.UTC(year, month - 1, resetDay));
     }
     return new Date(Date.UTC(year, month, resetDay));
   }
 
-  /**
-   * Get the end Date (UTC midnight) of the current reset period.
-   */
   function getPeriodEnd() {
     const start = getPeriodStart();
-    const year = start.getUTCFullYear();
-    const month = start.getUTCMonth();
-    return new Date(Date.UTC(year, month + 1, CONFIG.resetDayOfMonth));
+    return new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, CONFIG.resetDayOfMonth));
   }
 
-  /**
-   * Count the number of relevant days between two dates (exclusive of end).
-   * If workdaysOnly is true, only counts weekdays minus holidays.
-   */
   function countDays(from, to) {
     let count = 0;
     const cursor = new Date(from);
@@ -101,15 +217,10 @@
     return count;
   }
 
-  /**
-   * Calculate the fraction (0–1) of the current reset period that has elapsed.
-   */
   function getMonthProgress() {
     const start = getPeriodStart();
     const end = getPeriodEnd();
     const now = new Date();
-
-    // Clamp "now" to midnight UTC of today for a clean day boundary
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
     const totalDays = countDays(start, end);
@@ -123,14 +234,6 @@
   // Usage Status
   // =====================================================================
 
-  /**
-   * Determine whether current usage is over, under, or on-track relative
-   * to the projected allowance at this point in the period.
-   *
-   * @param {number} usagePercent  – actual usage percentage (0–100)
-   * @param {number} monthProgress – fraction of period elapsed (0–1)
-   * @returns {{ status: 'over'|'under'|'on-track', delta: number }}
-   */
   function getUsageStatus(usagePercent, monthProgress) {
     const projected = monthProgress * 100;
     const delta = usagePercent - projected;
@@ -148,21 +251,15 @@
   // DOM: Parse existing usage data
   // =====================================================================
 
-  /**
-   * Find the progress bar container on the page and extract the usage %.
-   * @returns {{ container: Element, usagePercent: number }|null}
-   */
   function parseUsageData() {
     const progressBar = document.getElementById('copilot_overages_progress_bar');
     if (!progressBar) return null;
 
-    // The parent wrapper that holds the label row + progress bar
     const wrapper = progressBar.closest(
       '[data-view-component="true"].d-inline-flex.flex-1.flex-column'
     );
     if (!wrapper) return null;
 
-    // The percentage text lives in the header row's second child
     const headerRow = wrapper.querySelector(
       '[data-view-component="true"].d-inline-flex.flex-items-center.flex-justify-between'
     );
@@ -182,9 +279,6 @@
   // DOM: Inject enhanced UI
   // =====================================================================
 
-  /**
-   * Add custom CSS styles for the usage indicator.
-   */
   function addStyles() {
     const css = `
       .monkey-progress-container {
@@ -269,18 +363,13 @@
     document.head.appendChild(style);
   }
 
-  /**
-   * Build and inject the enhanced progress bar + status indicator.
-   */
   function injectUsageIndicator(data, monthProgress, usageStatus) {
-    const { wrapper, progressBar, usagePercent } = data;
+    const { progressBar, usagePercent } = data;
     const monthPercent = parseFloat((monthProgress * 100).toFixed(1));
 
-    // Determine bar color
     const isOver = usageStatus.status === 'over';
     const barColor = isOver ? '#f85149' : '#238636';
 
-    // Build the enhanced container
     const container = document.createElement('div');
     container.className = 'monkey-progress-container';
 
@@ -301,11 +390,10 @@
     stack.appendChild(timeMarker);
     container.appendChild(stack);
 
-    // --- Status row (legend + badge) ---
+    // --- Status row ---
     const statusRow = document.createElement('div');
     statusRow.className = 'monkey-status-row';
 
-    // Legend
     const legend = document.createElement('div');
     legend.className = 'monkey-legend';
     legend.innerHTML = `
@@ -317,7 +405,6 @@
       </span>
     `;
 
-    // Badge
     const badgeWrapper = document.createElement('span');
     const badge = document.createElement('span');
     badge.className = 'monkey-status-badge';
@@ -338,7 +425,6 @@
     statusRow.appendChild(badgeWrapper);
     container.appendChild(statusRow);
 
-    // Replace the original progress bar with our enhanced version
     progressBar.replaceWith(container);
   }
 
@@ -364,10 +450,10 @@
       usagePercent: data.usagePercent,
       monthProgress: `${(monthProgress * 100).toFixed(1)}%`,
       status: usageStatus,
+      config: CONFIG,
     });
   }
 
-  // Run when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
